@@ -1,0 +1,178 @@
+TAREA:
+Construir TODO el código en Python necesario para un sistema que:
+- Lea velas de 1 minuto de varias criptomonedas desde MongoDB cada coleccion tiene esta forma: klines_bnbusdt por ejemplo para BNBUSDT.
+- Cada hora, entrene y genere predicciones para múltiples horizontes futuros.
+- Use SIEMPRE ventanas de X datos (minutos) según un algoritmo específico que se detalla abajo.
+- Guarde modelos, metadatos y predicciones en /app/models.
+- Genere documentación técnica detallada en ./docs explicando la implementación.
+- Comenta el código de forma precisa.
+- Explica claramente las decisiones técnicas y genera un documento de memoria técnica en ./docs con el detalle de la implementación.
+- Para el volumen de datos de entrenamiento te he colocado como variable X y en la definicion de los horizontes te enseño a calcular X.
+======================================================================
+1. CONTEXTO GENERAL
+======================================================================
+Ya existe una base de datos MongoDB (revisa el .env en esta carpeta para que tengas la cadena de conexion y y usa el mismo estilo que el codigo que ya tenemos generado pero con la nueva estrategia) que almacena datos de velas de criptomonedas con resolución de 1 minuto.
+Debes construir en Python un sistema que, para cada criptomoneda y en ejecuciones periódicas, haga lo siguiente:
+
+1) Determine la ventana de X datos de entrenamiento usando un algoritmo muy específico (descrito en el punto 3).
+2) A partir de esa historia, construya datasets supervisados para distintos horizontes de predicción.
+3) Entrene modelos por cada horizonte de tiempo y por cada símbolo.
+4) Genere predicciones para los próximos 60 minutos futuros, usando ventanas de tiempo que NO se solapan.
+5) Las predicciones en MongoDB en la coleccion correspondiente a cada criptomoneda (por ejemplo para BNBUSDT: prediccion_klines_bnbusdt).
+6) Documente la implementación.
+
+======================================================================
+2. CONEXIÓN A MONGODB Y ESTRUCTURA DE DATOS
+======================================================================
+- Ejemplo esperado de cada documento de vela a almacenar en prediccion (en minutes_ahead colocar si corresponde a una ventana 1 2 3 4 5 6 10 12 o la que sea de las descritas más abajo):
+open_time 1763337600000
+open 926.56
+high 926.8280922579764
+low 925.9936212444305
+close 926.2765977978705
+volume 762.6526186002488
+close_time 1763337659999
+predicted_at "2025-11-17T20:40:15.529736"
+minutes_ahead 1
+
+- Ejemplo de cada documento de vela a recibir en la data por minuto (corresponde a los datos recibidos desde el api de binance, esta consulta siempre es por minuto):
+_id 69166a8e9186c996b8210eb4
+open_time 1748736000000
+close 658.07
+close_time 1748736059999
+high 658.08
+low 658
+number_of_trades 193
+open 658.01
+quote_asset_volume 44610.72669
+taker_buy_base_asset_volume 57.726
+taker_buy_quote_asset_volume 37985.57905
+timestamp 2025-06-01T00:00:00.000+00:00
+volume 67.794
+
+======================================================================
+3. ALGORITMO EXACTO PARA DETERMINAR LA VENTANA DE X DATOS
+======================================================================
+Para cada símbolo, NO tomes una hora arbitraria; debes seguir ESTE algoritmo:
+
+1. *Identificar la última hora redonda en la base de datos:*
+   - Para el símbolo actual, consulta el máximo timestamp disponible en la colección de velas de 1 minuto.
+   - A ese máximo timestamp:
+   - Trúncalo eliminando minutos y segundos (y microsegundos), es decir, déjalo en “hora redonda” (minute = 0, second = 0, microsecond = 0).
+   - Llamaremos a este valor reference_time.
+   - Este reference_time es el *límite superior* (exclusivo) para la selección de datos de entrenamiento.
+
+2. *Calcular el límite inferior restando X minutos:*
+   - lower_bound = reference_time - X minutos.
+   - Este lower_bound es el límite inferior (inclusivo) de la ventana de entrenamiento.
+
+3. *Obtener la ventana exacta de X datos:*
+   - Consulta las velas de 1 minuto del símbolo en el rango:
+   - timestamp >= lower_bound y timestamp < reference_time.
+   - Debes obtener EXACTAMENTE X registros ordenados por timestamp.
+   - Si hay menos de X velas, NO entrenes modelos para ese símbolo y registra un log en MongoDB.
+
+4. *Acondicionar los datos obtenidos a la ventana que se va a predecir:*
+   - Con esta ventana de X velas ordenadas, construye la serie histórica que usarás para:
+     - Generar features.
+     - Construir los objetivos (targets) para los diferentes horizontes de predicción.
+   - Todos los puntos de corte históricos t_i que uses para construir muestras de entrenamiento deben estar comprendidos dentro del intervalo [lower_bound, reference_time), garantizando que para cada t_i existan 60 minutos futuros completos dentro de esa misma ventana para poder construir todos los horizontes.
+
+5. *Ejecutar el entrenamiento:*
+   - Con la ventana histórica de X datos ya definida y acondicionada:
+     - Construye el dataset supervisado (features y targets) para cada horizonte.
+     - Entrena los modelos correspondientes (uno por símbolo y horizonte).
+
+6. *Predecir el siguiente estado de la ventana:*
+   - Una vez entrenados los modelos para un símbolo:
+     - Usa como entrada la parte final de la ventana (los datos inmediatamente anteriores a reference_time) para generar predicciones de los futuros 60 minutos, particionados en intervalos no solapados (ver sección 4 y 6).
+   - Es decir, el “siguiente estado de la ventana” corresponde a las predicciones posteriores a reference_time, hasta 60 minutos después.
+
+7. *Truncar con la intersección de la ventana anterior:*
+   - La lógica de truncado es temporal:
+     - Para cada horizonte, el intervalo futuro que predices se define como:
+       - Límite inferior = donde termina la ventana anterior.
+       - Límite superior = el minuto máximo que abarca el horizonte actual.
+   - En otras palabras:
+     - El primer horizonte cubre [0, 1) minutos desde reference_time.
+     - El segundo horizonte cubre [1, 2) minutos.
+     - Y así sucesivamente, de forma que cada nuevo intervalo empieza donde terminó el anterior.
+   - Esto asegura que las ventanas futuras no se solapan y que cada horizonte representa un “bloque” consecutivo de tiempo sobre la línea temporal futura.
+
+======================================================================
+4. HORIZONTES DE PREDICCIÓN Y PARTICIÓN DEL FUTURO - CANTIDAD DE DATOS DE ENTRENAMIENTO
+======================================================================
+Debes predecir el comportamiento futuro de la criptomoneda en estos horizontes (en minutos):
+
+[1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30, 60]
+
+La partición futura debe seguir EXACTAMENTE esta lógica (relativa a reference_time):
+
+- Horizonte 1 minuto → intervalo [0, 1) minutos. X = 2 dias es decir 2880 minutos
+- Horizonte 2 minutos → intervalo [1, 2) minutos. X = 2 dias es decir 2880 minutos
+- Horizonte 3 minutos → intervalo [2, 3) minutos. X = 2 dias es decir 2880 minutos
+- Horizonte 4 minutos → intervalo [3, 4) minutos. X = 2 dias es decir 2880 minutos
+- Horizonte 5 minutos → intervalo [4, 5) minutos. X = 2 dias es decir 2880 minutos
+- Horizonte 6 minutos → intervalo [5, 6) minutos. X = 2 dias es decir 2880 minutos
+- Horizonte 10 minutos → intervalo [6, 10) minutos. X = 3 dias es decir 4320 minutos
+- Horizonte 12 minutos → intervalo [10, 12) minutos. X = 3 dias es decir 4320 minutos
+- Horizonte 15 minutos → intervalo [12, 15) minutos. X = 3 dias es decir 4320 minutos
+- Horizonte 20 minutos → intervalo [15, 20) minutos. X = 4 dias es decir 5760 minutos
+- Horizonte 30 minutos → intervalo [20, 30) minutos. X = 4 dias es decir 5760 minutos
+- Horizonte 60 minutos → intervalo [30, 60) minutos. X = 6 dias es decir 8640 minutos
+
+Cada intervalo:
+- Usa como límite inferior el final del intervalo anterior.
+- Usa como límite superior el final del rango que le corresponde.
+- No se solapa con los demás.
+
+======================================================================
+5. CONSTRUCCIÓN DE LA VARIABLE OBJETIVO (TARGET)
+======================================================================
+Para ENTRENAMIENTO, simula muchas veces la situación de tener una t_i dentro de la ventana y querer predecir los 60 minutos siguientes particionados en esos intervalos.
+
+Para cada símbolo:
+
+1) Elige puntos de corte históricos t_i dentro de [lower_bound, reference_time) para los que dispongas de al menos 60 minutos futuros dentro de la ventana de X datos.
+
+2) Para cada t_i y cada horizonte H:
+   - Define los intervalos futuros relativos a t_i usando exactamente la misma lógica de partición que para reference_time (bloques consecutivos sin solapamientos).
+   - Para cada intervalo:
+     - Usa las velas de 1 minuto dentro de ese intervalo para construir una “vela agregada”.
+
+3) El target del horizonte H será, por ejemplo, target_close (o target_return) de la vela agregada del intervalo correspondiente.
+
+======================================================================
+6. AGRUPACIÓN (RESAMPLE) DE VELAS COMO FEATURES
+======================================================================
+Además de las velas de 1 minuto, construye series re-muestreadas agrupando velas en bloques de tamaño N:
+
+N ∈ [1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30, 60] minutos.
+
+Para cada N:
+- A partir de la ventana de X velas de 1 minuto:
+  - Agrupa en bloques de N minutos consecutivos (p.ej. con pandas resample('Nmin')).
+  - Genera agregados con las mismas varaibles de las velas originales pero agregando sus valores para la nueva vela agrupada.
+
+======================================================================
+7. CONSIDERACIONES GENERALES
+======================================================================
+Considera que el predictor estara siempre activo, Y su ejecucion debe cumplir las siguientes condiciones para proceder:
+Por ejemplo siendo que se enciende el docker y ya han transcurrido horas del dia validamos cual fue la ultima predicicon del dia de hoy realizada y esperamos a tener los datos en la base de datos reales de la ultima hora, una vez los tengamos entonces observamos por ejemplo que no tenemos desde las 00:00 del dia de hoy. Entonces el intervalo a predecir corresponde de 00:00 a 01:00 y procedemos a entrenar la red y predecimos ese intervalo, luego seguimos asi hasta alcanzar la hora actual redondeada en minutos y segundos por ejemplo 8:00 pero para ello vamos a necesitar que en la base de datos este los datos de las 8:00 de las velas reales, esperamos entonces a tener los datos reales ahsta las 8:00 y procedemos para la prediccion del intervalo de 8:00 a 9:00, si no existe prediccion de 8:00 a 9:00 significa que aun no hemos realizado la prediccion y debemos continuar, y lanzamos la predccion para ese rango de tiempo.
+El bucle puede continuar validando cada 5 segundos, pues no se lanzara nuevamente sino cuando alcance las 9:00 y maximo 9:00:05 observando que no existen datos para la proxima hora y volvera a ejecutar la validacion de tener el dato real de las 9:00 y lanzara la nueva prediccion.
+
+El mejor resultado lo obtenemos calculando tendencias para cada ventana de tiempo, y el cambio que la moneda tendrá. De esa forma usamos como open(n) el valor real del close(n-1), el close(n) es predicho por la red, asi mismo high(n) low(n) son predichos por la red.
+
+Recuerda que la prediccion de cada hora incluye las predicciones delos horizontes mencionados en condiciones.txt.
+======================================================================
+8. VIGENCIA DE LOS 12 MODELOS POR CADA SIMBOLO (1 por cada horizonte)
+======================================================================
+Los modelos se almacenan con nombres distintivos por cada simbolo en /app/models junto con sus metadatos.
+El modelo debe ser entrenado considerando las ventanas y horizontes detallados previamente enfocado a la hora 00:00 del nuevo día, y una vez entrenado debe ser almacenado.
+El modelo debe recibir los datos de la ultima vela correspondiente de acuerdo al horizonte a predecir y devolver el dato predicho y almacenarlo en la base de datos de MongoDB.
+El modelo tendra vigencia durante todo el día en curso  para hacer las predicciones sin volverlo a generar y ahorrando tiempo.
+Una vez el modelo pierde vigencia debe ser eliminado para volver a entrenarlo para el siguiente día.
+======================================================================
+9. RESULTADO ESPERADO
+======================================================================
+Para las 24 horas del dia en cada hora 1 prediccion por cada horizonte, total 12 predicciones por cada hora.

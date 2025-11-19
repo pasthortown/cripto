@@ -1,0 +1,162 @@
+version: '3.8'
+
+services:
+  # Servicio de MongoDB
+  mongodb:
+    image: mongo:7.0
+    container_name: binance_mongodb
+    restart: unless-stopped
+    ports:
+      - "${MONGODB_PORT}:27017"  # Puerto externo configurable -> Puerto interno 27017
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      cripto_net:
+        ipv4_address: ${MONGODB_IP}
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGODB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGODB_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=${MONGODB_DATABASE}
+    healthcheck:
+      test: |
+        mongosh --quiet --eval "db.adminCommand('ping')" \
+        -u ${MONGODB_ROOT_USERNAME} \
+        -p ${MONGODB_ROOT_PASSWORD} \
+        --authenticationDatabase admin
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Servicio del backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: binance_backend
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT}:8888"  # Puerto del API
+    volumes:
+      - ./logs:/logs  # Compartir carpeta de logs con el host
+    networks:
+      cripto_net:
+        ipv4_address: ${BACKEND_IP}
+    environment:
+      - MONGODB_HOST=mongodb
+      - MONGODB_PORT=27017
+      - MONGODB_DATABASE=${MONGODB_DATABASE}
+      - MONGODB_USERNAME=${MONGODB_ROOT_USERNAME}
+      - MONGODB_PASSWORD=${MONGODB_ROOT_PASSWORD}
+      - SERVER_PORT=8888
+      - LOG_LEVEL=${LOG_LEVEL}
+      - LOG_DIR=/logs
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8888/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Servicio de sincronización automática
+  coin_sync:
+    build:
+      context: ./coin_sync
+      dockerfile: Dockerfile
+    container_name: binance_coin_sync
+    restart: unless-stopped
+    volumes:
+      - ./logs:/logs  # Compartir carpeta de logs con el host
+    networks:
+      cripto_net:
+        ipv4_address: ${COIN_SYNC_IP}
+    environment:
+      - BACKEND_URL=http://backend:8888
+      - SYNC_INTERVAL_SECONDS=${SYNC_INTERVAL_SECONDS}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - LOG_DIR=/logs
+      - HTTP_TIMEOUT=300
+      - MAX_RETRIES=3
+      - RETRY_DELAY_SECONDS=10
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # Servicio de predicción con LSTM
+  predictor:
+    build:
+      context: ./predictor
+      dockerfile: Dockerfile
+    container_name: binance_predictor
+    restart: always
+    volumes:
+      - ./logs:/logs  # Compartir carpeta de logs con el host
+      - predictor_models:/app/models  # Persistir modelos entrenados
+    networks:
+      cripto_net:
+        ipv4_address: ${PREDICTOR_IP}
+    environment:
+      - MONGODB_HOST=mongodb
+      - MONGODB_PORT=27017
+      - MONGODB_DATABASE=${MONGODB_DATABASE}
+      - MONGODB_USERNAME=${MONGODB_ROOT_USERNAME}
+      - MONGODB_PASSWORD=${MONGODB_ROOT_PASSWORD}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - LOG_DIR=/logs
+      - MODELS_DIR=/app/models
+      - MODEL_MAX_AGE_DAYS=${MODEL_MAX_AGE_DAYS}
+      - LSTM_UNITS=${LSTM_UNITS}
+      - LSTM_LAYERS=${LSTM_LAYERS}
+      - DROPOUT_RATE=${DROPOUT_RATE}
+      - EPOCHS=${EPOCHS}
+      - BATCH_SIZE=${BATCH_SIZE}
+      - SEQUENCE_LENGTH=${SEQUENCE_LENGTH}
+      - VALIDATION_SPLIT=${VALIDATION_SPLIT}
+      - PREDICTION_INTERVAL_HOURS=${PREDICTION_INTERVAL_HOURS}
+      - PREDICTION_MINUTES=${PREDICTION_MINUTES}
+      - SYMBOLS_TO_PREDICT=${SYMBOLS_TO_PREDICT}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  # Servicio del frontend con Nginx
+  frontend:
+    build:
+      context: ./frontend-docker
+      dockerfile: Dockerfile
+    container_name: binance_frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"  # Puerto externo 8080 -> Puerto interno 80
+    volumes:
+      - ./htdocs:/usr/share/nginx/html  # Compartir htdocs con nginx
+    networks:
+      cripto_net:
+        ipv4_address: ${FRONTEND_IP}
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+# Definición de la red cripto_net
+networks:
+  cripto_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.31.0/24
+          gateway: 192.168.31.1
+
+# Volúmenes para persistencia de datos
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  predictor_models:
+    driver: local

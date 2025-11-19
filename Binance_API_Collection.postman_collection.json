@@ -1,0 +1,361 @@
+{
+	"info": {
+		"_postman_id": "12345678-1234-1234-1234-123456789abc",
+		"name": "Binance Cryptocurrency Analysis API",
+		"description": "Colección completa de endpoints para el sistema de análisis y predicción de criptomonedas",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8888/health",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8888",
+					"path": [
+						"health"
+					]
+				},
+				"description": "Verifica el estado del servicio y la conexión a MongoDB"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Available Symbols",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8888/api/symbols",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8888",
+					"path": [
+						"api",
+						"symbols"
+					]
+				},
+				"description": "Obtiene la lista de monedas disponibles en la base de datos"
+			},
+			"response": []
+		},
+		{
+			"name": "Sync Data - BTCUSDT",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"symbol\": \"BTCUSDT\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8888/api/sync",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8888",
+					"path": [
+						"api",
+						"sync"
+					]
+				},
+				"description": "Sincroniza datos de BTCUSDT desde Binance API"
+			},
+			"response": []
+		},
+		{
+			"name": "Sync Data - ETHUSDT",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"symbol\": \"ETHUSDT\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8888/api/sync",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8888",
+					"path": [
+						"api",
+						"sync"
+					]
+				},
+				"description": "Sincroniza datos de ETHUSDT desde Binance API"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Data - BTCUSDT (Latest 100)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8888/api/data/BTCUSDT?limit=100",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8888",
+					"path": [
+						"api",
+						"data",
+						"BTCUSDT"
+					],
+					"query": [
+						{
+							"key": "limit",
+							"value": "100"
+						}
+					]
+				},
+				"description": "Obtiene los últimos 100 registros de datos históricos de BTCUSDT"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Data - BTCUSDT (With Time Range)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8888/api/data/BTCUSDT?start_time=1731542400000&end_time=1731628799999&limit=1000",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8888",
+					"path": [
+						"api",
+						"data",
+						"BTCUSDT"
+					],
+					"query": [
+						{
+							"key": "start_time",
+							"value": "1731542400000",
+							"description": "Timestamp en milisegundos (14 Nov 2025)"
+						},
+						{
+							"key": "end_time",
+							"value": "1731628799999",
+							"description": "Timestamp en milisegundos (15 Nov 2025)"
+						},
+						{
+							"key": "limit",
+							"value": "1000"
+						}
+					]
+				},
+				"description": "Obtiene datos históricos de BTCUSDT en un rango de tiempo específico"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Stats - BTCUSDT",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8888/api/stats/BTCUSDT",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8888",
+					"path": [
+						"api",
+						"stats",
+						"BTCUSDT"
+					]
+				},
+				"description": "Obtiene estadísticas de BTCUSDT (total de registros, primer y último registro)"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Stats - ETHUSDT",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8888/api/stats/ETHUSDT",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8888",
+					"path": [
+						"api",
+						"stats",
+						"ETHUSDT"
+					]
+				},
+				"description": "Obtiene estadísticas de ETHUSDT"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Predictions - BTCUSDT (All)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8888/api/predictions/BTCUSDT",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8888",
+					"path": [
+						"api",
+						"predictions",
+						"BTCUSDT"
+					]
+				},
+				"description": "Obtiene todas las predicciones de BTCUSDT"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Predictions - BTCUSDT (Latest 100)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8888/api/predictions/BTCUSDT?limit=100",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8888",
+					"path": [
+						"api",
+						"predictions",
+						"BTCUSDT"
+					],
+					"query": [
+						{
+							"key": "limit",
+							"value": "100"
+						}
+					]
+				},
+				"description": "Obtiene las últimas 100 predicciones de BTCUSDT"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Predictions - BTCUSDT (With Time Range)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8888/api/predictions/BTCUSDT?start_time=1731542400000&end_time=1731628799999",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8888",
+					"path": [
+						"api",
+						"predictions",
+						"BTCUSDT"
+					],
+					"query": [
+						{
+							"key": "start_time",
+							"value": "1731542400000",
+							"description": "Timestamp en milisegundos"
+						},
+						{
+							"key": "end_time",
+							"value": "1731628799999",
+							"description": "Timestamp en milisegundos"
+						}
+					]
+				},
+				"description": "Obtiene predicciones de BTCUSDT en un rango de tiempo específico"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Predictions - ETHUSDT (Latest 100)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8888/api/predictions/ETHUSDT?limit=100",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8888",
+					"path": [
+						"api",
+						"predictions",
+						"ETHUSDT"
+					],
+					"query": [
+						{
+							"key": "limit",
+							"value": "100"
+						}
+					]
+				},
+				"description": "Obtiene las últimas 100 predicciones de ETHUSDT"
+			},
+			"response": []
+		},
+		{
+			"name": "Get Predictions - BNBUSDT (Latest 100)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8888/api/predictions/BNBUSDT?limit=100",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8888",
+					"path": [
+						"api",
+						"predictions",
+						"BNBUSDT"
+					],
+					"query": [
+						{
+							"key": "limit",
+							"value": "100"
+						}
+					]
+				},
+				"description": "Obtiene las últimas 100 predicciones de BNBUSDT"
+			},
+			"response": []
+		}
+	]
+}

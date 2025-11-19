@@ -1,0 +1,20 @@
+# Framework web asíncrono
+tornado==6.4.1
+
+# Cliente HTTP asíncrono para Binance API
+aiohttp==3.9.5
+
+# Driver asíncrono de MongoDB
+motor==3.5.1
+
+# Driver de MongoDB (dependencia de Motor)
+pymongo==4.8.0
+
+# Para testing
+pytest==8.3.2
+pytest-asyncio==0.23.8
+pytest-tornado==0.8.1
+pytest-cov==5.0.0
+
+# Para mocking en tests
+pytest-mock==3.14.0

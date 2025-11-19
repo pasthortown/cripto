@@ -1,0 +1,6 @@
+Se deben sincronizar todas las monedas de la base de datos.
+Debe validar el ultimo dato en la base de datos almacenado.
+Todos los datos deben ser con separacion de 1 minuto
+Se debe traer los datos desde binance de la moneda correspondiente hasta el minuto actual sin segundos en rangos de 1 minuto
+Se debe observar que el close(N-1) = open(N)
+Se debe monitorear el proceso cada 5 segundos con sleep(5) validando que el tiempo este entre los dentro de los 5 primeros segundos del minuto actual para volver a traer los datos desde binance. Si el dato ya existe en la base de datos se obvia el dato.

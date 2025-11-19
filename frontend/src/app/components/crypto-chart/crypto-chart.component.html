@@ -1,0 +1,127 @@
+<div class="crypto-chart-container">
+  <!-- Header with Status and Controls -->
+  <div class="header-controls">
+    <!-- Status Indicators (Left) -->
+    <div class="status-indicators">
+      <span class="status-item" [class.connected]="wsConnected" [class.disconnected]="!wsConnected">
+        <span class="status-dot"></span>
+        {{ wsConnected ? 'Conectado' : 'Desconectado' }}
+      </span>
+      <span class="status-item" *ngIf="lastUpdate">
+        Última actualización: {{ lastUpdate | date:'HH:mm:ss' }}
+      </span>
+    </div>
+
+    <!-- Controls (Right) -->
+    <div class="controls">
+      <div class="control-group">
+        <select
+          id="symbol-select"
+          [(ngModel)]="selectedSymbol"
+          (change)="onSymbolChange()"
+          class="select-input"
+        >
+          <option *ngFor="let symbol of availableSymbols" [value]="symbol.symbol">
+            {{ symbol.symbol }} - ${{ symbol.last_price | number:'1.2-2' }}
+          </option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <!-- Mostrar dropdown cuando NO hay zoom -->
+        <select
+          *ngIf="!isZoomed"
+          id="timerange-select"
+          [(ngModel)]="selectedTimeRange"
+          (change)="onTimeRangeChange()"
+          class="select-input"
+        >
+          <option *ngFor="let range of timeRanges" [value]="range.value">
+            {{ range.label }}
+          </option>
+        </select>
+
+        <!-- Mostrar botón "Personalizado" cuando hay zoom -->
+        <button
+          *ngIf="isZoomed"
+          (click)="resetZoom()"
+          class="custom-range-button"
+        >
+          📊 Personalizado
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content: Info Cards Left + Chart Right -->
+  <div class="main-content">
+    <!-- Info Panel (Left Sidebar) -->
+    <div class="info-panel-left">
+      <div class="info-card">
+        <h3>Datos Históricos</h3>
+        <p class="info-value">{{ klines.length }}</p>
+        <p class="info-label">registros</p>
+      </div>
+
+      <div class="info-card">
+        <h3>Predicciones</h3>
+        <p class="info-value">{{ predictions.length }}</p>
+        <p class="info-label">predicciones cargadas</p>
+      </div>
+
+      <div class="info-card" *ngIf="klines.length > 0">
+        <h3>Último Precio</h3>
+        <p class="info-value">{{ klines[klines.length - 1].close | currency:'USD':'symbol':'1.2-2' }}</p>
+        <p class="info-label">{{ klines[klines.length - 1].timestamp | date:'short' }}</p>
+      </div>
+
+      <div class="info-card prediction-card" *ngIf="selectedPrediction" [style.background]="getPredictionGradient()">
+        <h3>Predicción</h3>
+        <p class="info-value prediction-open">Apertura: {{ selectedPrediction.open | currency:'USD':'symbol':'1.2-2' }}</p>
+        <p class="info-value prediction-close">Cierre: {{ selectedPrediction.close | currency:'USD':'symbol':'1.2-2' }}</p>
+        <p class="info-label">{{ selectedPrediction.open_time | date:'dd/MM/yyyy HH:mm' }}</p>
+      </div>
+    </div>
+
+    <!-- Chart Section (Right) -->
+    <div class="chart-section">
+      <!-- Chart Container -->
+      <div class="chart-wrapper">
+        <!-- Loading State -->
+        <div *ngIf="loading" class="loading-overlay">
+          <div class="spinner"></div>
+          <p>Cargando datos...</p>
+        </div>
+
+        <!-- Error State -->
+        <div *ngIf="error && !loading" class="error-message">
+          <p>⚠️ {{ error }}</p>
+          <button (click)="refreshData()" class="retry-button">Reintentar</button>
+        </div>
+
+        <!-- Chart -->
+        <div class="chart-container" [class.hidden]="loading || error">
+          <canvas #chartCanvas></canvas>
+        </div>
+      </div>
+
+      <!-- Legend (below chart) -->
+      <div class="legend">
+        <div class="legend-items">
+          <div class="legend-item">
+            <span class="legend-color real-color"></span>
+            <span>Precio Real</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-color prediction-open-color"></span>
+            <span>Predicción Apertura (lavanda punteado)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-color prediction-close-color"></span>
+            <span>Predicción Cierre (celeste punteado)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

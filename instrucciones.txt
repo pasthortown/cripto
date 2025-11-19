@@ -1,0 +1,14 @@
+Debes construir usando python.
+El resultado debe ser colocado en una carpeta denominada backend
+Debes usar la libreria tornado
+Debes exponer los siguientes endpoints:
+- Consumo de los datos desde 1-6-2025 hasta la fecha
+- Debes validar los datos que tenemos en la base de datos y obtener desde la ultima fecha hasta la fecha actual, en caso de no tener datos buscas desde el 1-6-2025.
+- La funcion debe traer los datos de la moneda solicitada.
+- Cada moneda se almacena en una coleccion diferente
+- La base de datos que usaremos sera mongodb en el puerto 21018 tambien corriendo sobre docker por tanto en el docker interno debe ser 27017
+- Debes generar la imagen en docker con el api
+- Ejecuta una corrida de prueba para BTSUSDT (bitcoin)
+- los intervalos deben ser de 1 minuto.
+Genera un set de pruebas unitarias, todo el codigo debe estar comentado.
+Debes usar una red para esto denominada cripto_net 192.168.31.0/24 y usar para los servicios desde la ip .10

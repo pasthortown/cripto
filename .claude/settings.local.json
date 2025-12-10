@@ -48,7 +48,8 @@
       "Bash(del htdocsmain-VW4OF44V.js)",
       "Bash(docker cp:*)",
       "Bash(timeout:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git branch:*)"
     ],
     "deny": [],
     "ask": []
